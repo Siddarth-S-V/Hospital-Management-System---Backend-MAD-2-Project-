@@ -20,7 +20,7 @@ This Hospital Management System allows **Admins**, **Doctors**, and **Patients**
 │   Vue.js        │    │   Flask API     │    │ Background Jobs │
 │   Frontend      │◄──►│   Backend       │◄──►│ Celery + Redis  │
 │                 │    │                 │    │                 │
-│• Admin Dashboard│    │• Authentication│     │• Daily Reminders│
+│• Admin Dashboard│    │• Authentication │    │• Daily Reminders│
 │• Doctor Portal  │    │• CRUD APIs      │    │• Monthly Reports│
 │• Patient Portal │    │• Role Management│    │• CSV Export     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
