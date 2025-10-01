@@ -20,9 +20,9 @@ This Hospital Management System allows **Admins**, **Doctors**, and **Patients**
 │   Vue.js        │    │   Flask API     │    │ Background Jobs │
 │   Frontend      │◄──►│   Backend       │◄──►│ Celery + Redis  │
 │                 │    │                 │    │                 │
-│ • Admin Dashboard│    │ • Authentication│    │ • Daily Reminders│
-│ • Doctor Portal │    │ • CRUD APIs     │    │ • Monthly Reports│
-│ • Patient Portal│    │ • Role Management│    │ • CSV Export    │
+│• Admin Dashboard│    │• Authentication│     │• Daily Reminders│
+│• Doctor Portal  │    │• CRUD APIs      │    │• Monthly Reports│
+│• Patient Portal │    │• Role Management│    │• CSV Export     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                               │
                               ▼
@@ -529,4 +529,4 @@ This project is created for educational purposes as part of the MAD-2 (Modern Ap
 
 ---
 
-*Built with ❤️ for MAD-2 coursework - October 2025*
+*Built by S V Siddarth - October 2025*
