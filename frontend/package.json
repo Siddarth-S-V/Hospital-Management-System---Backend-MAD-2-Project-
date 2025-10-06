@@ -1,0 +1,19 @@
+{
+  "name": "medical-appointment-frontend",
+  "version": "1.0.0",
+  "description": "Vue 3 Frontend for Medical Appointment System",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "bootstrap": "^5.3.2",
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.3.4",
+    "vite": "^7.1.9"
+  }
+}

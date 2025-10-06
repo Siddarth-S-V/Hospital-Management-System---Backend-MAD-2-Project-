@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Monthly Activity Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #28a745; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background-color: #f8f9fa; }
+        .stats-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .stats-table th, .stats-table td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        .stats-table th { background-color: #007bff; color: white; }
+        .stats-table tr:nth-child(even) { background-color: #f2f2f2; }
+        .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Monthly Activity Report</h1>
+            <p>{{ month_year }}</p>
+        </div>
+        <div class="content">
+            <p>Dear Dr. {{ doctor_name }},</p>
+            <p>Here's your monthly activity summary:</p>
+
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>📋 Metric</th>
+                        <th>📈 Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Total Appointments</td>
+                        <td>{{ total_appointments }}</td>
+                    </tr>
+                    <tr>
+                        <td>✅ Completed Appointments</td>
+                        <td>{{ completed_appointments }}</td>
+                    </tr>
+                    <tr>
+                        <td>❌ Cancelled Appointments</td>
+                        <td>{{ cancelled_appointments }}</td>
+                    </tr>
+                    <tr>
+                        <td>📝 Treatment Records</td>
+                        <td>{{ treatment_records }}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>Thank you for your dedicated service to our patients!</p>
+        </div>
+        <div class="footer">
+            <p>Medical Appointment System<br>
+            This is an automated monthly report.</p>
+        </div>
+    </div>
+</body>
+</html>
