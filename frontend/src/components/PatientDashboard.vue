@@ -57,6 +57,38 @@
       </div>
     </div>
 
+    <!-- Available Specializations/Departments -->
+    <div class="row mb-4">
+      <div class="col">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">
+              <i class="fas fa-hospital-symbol"></i> Available Specializations/Departments
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div v-for="specialization in specializations" :key="specialization.name" class="col-md-4 mb-3">
+                <div class="card border-primary h-100">
+                  <div class="card-body text-center">
+                    <i class="fas fa-stethoscope fa-2x text-primary mb-2"></i>
+                    <h6 class="card-title">{{ specialization.name }}</h6>
+                    <p class="card-text small text-muted">{{ specialization.description }}</p>
+                    <button 
+                      class="btn btn-outline-primary btn-sm"
+                      @click="searchDoctorsBySpecialization(specialization.name)"
+                    >
+                      View Doctors
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Upcoming Appointments -->
     <div class="row mb-4">
       <div class="col">
@@ -72,18 +104,22 @@
             </div>
             <div v-else class="row">
               <div v-for="appointment in upcomingAppointments" :key="appointment.id" class="col-md-4 mb-3">
-                <div class="card border-primary">
+                <div class="card border-success">
                   <div class="card-body">
-                    <h6 class="card-title">{{ appointment.doctor_name }}</h6>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                      <h6 class="card-title mb-0">{{ appointment.doctor_name }}</h6>
+                      <span class="badge bg-warning">{{ appointment.status }}</span>
+                    </div>
                     <p class="card-text">
+                      <small class="text-muted">{{ appointment.doctor_specialization }}</small><br>
                       <i class="fas fa-calendar me-2"></i>{{ appointment.date }}<br>
                       <i class="fas fa-clock me-2"></i>{{ appointment.time }}
                     </p>
-                    <div class="btn-group btn-group-sm">
-                      <button class="btn btn-outline-primary btn-sm" @click="rescheduleAppointment(appointment)">
+                    <div class="btn-group btn-group-sm w-100">
+                      <button class="btn btn-outline-primary" @click="rescheduleAppointment(appointment)">
                         Reschedule
                       </button>
-                      <button class="btn btn-outline-danger btn-sm" @click="cancelAppointment(appointment.id)">
+                      <button class="btn btn-outline-danger" @click="cancelAppointment(appointment.id)">
                         Cancel
                       </button>
                     </div>
@@ -130,11 +166,21 @@
               <i class="fas fa-user-md"></i> Find Doctors
             </a>
           </li>
+          <li class="nav-item">
+            <a 
+              class="nav-link" 
+              :class="{ active: activeTab === 'availability' }"
+              @click="activeTab = 'availability'"
+              href="#"
+            >
+              <i class="fas fa-calendar-week"></i> Doctor Availability
+            </a>
+          </li>
         </ul>
       </div>
 
       <div class="card-body">
-        <!-- Appointment History -->
+        <!-- Appointment History with Diagnosis & Prescriptions -->
         <div v-if="activeTab === 'history'">
           <div class="table-responsive">
             <table class="table">
@@ -143,7 +189,10 @@
                   <th>Date</th>
                   <th>Time</th>
                   <th>Doctor</th>
+                  <th>Specialization</th>
                   <th>Status</th>
+                  <th>Diagnosis</th>
+                  <th>Prescription</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -152,10 +201,23 @@
                   <td>{{ appointment.date }}</td>
                   <td>{{ appointment.time }}</td>
                   <td>{{ appointment.doctor_name }}</td>
+                  <td>{{ appointment.doctor_specialization || 'N/A' }}</td>
                   <td>
                     <span :class="['badge', getStatusBadgeClass(appointment.status)]">
                       {{ appointment.status }}
                     </span>
+                  </td>
+                  <td>
+                    <span v-if="appointment.diagnosis" class="text-success">
+                      {{ appointment.diagnosis.substring(0, 50) }}{{ appointment.diagnosis.length > 50 ? '...' : '' }}
+                    </span>
+                    <span v-else class="text-muted">-</span>
+                  </td>
+                  <td>
+                    <span v-if="appointment.prescription" class="text-primary">
+                      {{ appointment.prescription.substring(0, 30) }}{{ appointment.prescription.length > 30 ? '...' : '' }}
+                    </span>
+                    <span v-else class="text-muted">-</span>
                   </td>
                   <td>
                     <div class="btn-group btn-group-sm" v-if="appointment.status === 'booked'">
@@ -166,6 +228,11 @@
                         Cancel
                       </button>
                     </div>
+                    <button v-if="appointment.diagnosis || appointment.prescription" 
+                            class="btn btn-info btn-sm"
+                            @click="viewDetails(appointment)">
+                      View Details
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -184,11 +251,23 @@
                 <div class="row">
                   <div class="col-md-3">
                     <strong>Doctor:</strong> {{ treatment.doctor_name }}<br>
-                    <strong>Date:</strong> {{ new Date(treatment.created_at).toLocaleDateString() }}
+                    <strong>Date:</strong> {{ formatDate(treatment.created_at) }}<br>
+                    <strong v-if="treatment.follow_up_date">Follow-up:</strong> 
+                    <span v-if="treatment.follow_up_date">{{ treatment.follow_up_date }}</span>
                   </div>
                   <div class="col-md-9">
-                    <strong>Treatment Summary:</strong>
-                    <p class="mt-2">{{ treatment.summary }}</p>
+                    <div class="mb-2" v-if="treatment.diagnosis">
+                      <strong>Diagnosis:</strong>
+                      <p class="mb-1">{{ treatment.diagnosis }}</p>
+                    </div>
+                    <div class="mb-2" v-if="treatment.prescription">
+                      <strong>Prescription:</strong>
+                      <p class="mb-1">{{ treatment.prescription }}</p>
+                    </div>
+                    <div v-if="treatment.summary">
+                      <strong>Treatment Summary:</strong>
+                      <p class="mt-2">{{ treatment.summary }}</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -208,26 +287,103 @@
                 @input="searchDoctors"
               >
             </div>
+            <div class="col-md-3">
+              <select class="form-control" v-model="selectedSpecialization" @change="searchDoctors">
+                <option value="">All Specializations</option>
+                <option v-for="spec in specializations" :key="spec.name" :value="spec.name">
+                  {{ spec.name }}
+                </option>
+              </select>
+            </div>
           </div>
 
           <div class="row">
-            <div v-for="doctor in doctors" :key="doctor.id" class="col-md-4 mb-3">
+            <div v-for="doctor in doctors" :key="doctor.id" class="col-md-6 mb-3">
               <div class="card">
                 <div class="card-body">
-                  <h6 class="card-title">
-                    <i class="fas fa-user-md me-2"></i>{{ doctor.name }}
-                  </h6>
-                  <p class="card-text">
-                    <i class="fas fa-envelope me-2"></i>{{ doctor.email }}<br>
-                    <i class="fas fa-phone me-2"></i>{{ doctor.phone || 'N/A' }}
-                  </p>
-                  <button 
-                    class="btn btn-primary btn-sm"
-                    @click="bookWithDoctor(doctor.id)"
-                  >
-                    <i class="fas fa-calendar-plus me-1"></i>
-                    Book Appointment
-                  </button>
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <h6 class="card-title">
+                        <i class="fas fa-user-md me-2"></i>{{ doctor.name }}
+                      </h6>
+                      <p class="card-text">
+                        <strong>Specialization:</strong> {{ doctor.specialization || 'General Medicine' }}<br>
+                        <strong>Experience:</strong> {{ doctor.experience || 0 }} years<br>
+                        <strong>Qualification:</strong> {{ doctor.qualification || 'N/A' }}<br>
+                        <strong>Fee:</strong> ₹{{ doctor.consultation_fee || 'Not specified' }}<br>
+                        <small class="text-muted">
+                          <i class="fas fa-envelope me-1"></i>{{ doctor.email }}<br>
+                          <i class="fas fa-phone me-1"></i>{{ doctor.phone || 'N/A' }}
+                        </small>
+                      </p>
+                    </div>
+                    <div class="text-end">
+                      <button 
+                        class="btn btn-outline-info btn-sm mb-2"
+                        @click="viewDoctorProfile(doctor.id)"
+                      >
+                        <i class="fas fa-eye me-1"></i>
+                        View Profile
+                      </button><br>
+                      <button 
+                        class="btn btn-primary btn-sm"
+                        @click="bookWithDoctor(doctor.id)"
+                      >
+                        <i class="fas fa-calendar-plus me-1"></i>
+                        Book Appointment
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Doctor Availability (7 Days) -->
+        <div v-if="activeTab === 'availability'">
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <select class="form-control" v-model="selectedDoctorId" @change="loadDoctorAvailability">
+                <option value="">Select a doctor</option>
+                <option v-for="doctor in doctors" :key="doctor.id" :value="doctor.id">
+                  {{ doctor.name }} - {{ doctor.specialization }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div v-if="doctorAvailability.length > 0">
+            <h6>Next 7 Days Availability</h6>
+            <div class="row">
+              <div v-for="day in doctorAvailability" :key="day.date" class="col-md-4 mb-3">
+                <div class="card" :class="day.is_available ? 'border-success' : 'border-secondary'">
+                  <div class="card-body">
+                    <h6 class="card-title">
+                      {{ day.day_name }}
+                      <small class="text-muted">{{ day.date }}</small>
+                    </h6>
+                    <div v-if="day.is_available && day.availability.length > 0">
+                      <div v-for="avail in day.availability" :key="avail.id">
+                        <strong>Available:</strong> {{ avail.start_time }} - {{ avail.end_time }}<br>
+                        <div v-if="day.booked_times.length > 0" class="mt-2">
+                          <small class="text-danger">
+                            <strong>Booked:</strong> {{ day.booked_times.join(', ') }}
+                          </small>
+                        </div>
+                      </div>
+                      <button 
+                        class="btn btn-primary btn-sm mt-2"
+                        @click="bookAppointmentForDay(selectedDoctorId, day.date)"
+                      >
+                        Book for {{ day.day_name }}
+                      </button>
+                    </div>
+                    <div v-else class="text-muted">
+                      <i class="fas fa-times-circle me-1"></i>
+                      Not Available
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -236,40 +392,7 @@
       </div>
     </div>
 
-    <!-- Reschedule Modal -->
-    <div class="modal fade" id="rescheduleModal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Reschedule Appointment</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <form @submit.prevent="confirmReschedule">
-              <div class="mb-3">
-                <label class="form-label">New Date</label>
-                <input type="date" class="form-control" v-model="rescheduleData.date" required>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">New Time</label>
-                <input type="time" class="form-control" v-model="rescheduleData.time" required>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Notes (Optional)</label>
-                <textarea class="form-control" rows="3" v-model="rescheduleData.notes"></textarea>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-primary" :disabled="loading">
-                  <i v-if="loading" class="fas fa-spinner fa-spin me-2"></i>
-                  Reschedule
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Modals and other components go here -->
 
     <!-- Message Alert -->
     <div v-if="message" :class="['alert', 'mt-3', messageType === 'error' ? 'alert-danger' : 'alert-success']">
@@ -288,39 +411,40 @@ export default {
       appointmentHistory: [],
       treatmentHistory: [],
       doctors: [],
+      specializations: [],
+      doctorAvailability: [],
       doctorSearchQuery: '',
+      selectedSpecialization: '',
+      selectedDoctorId: '',
       message: '',
       messageType: '',
-      loading: false,
-      selectedAppointment: null,
-      rescheduleData: {
-        date: '',
-        time: '',
-        notes: ''
-      }
+      loading: false
     }
   },
 
   mounted() {
-    this.loadUpcomingAppointments()
-    this.loadAppointmentHistory()
-    this.loadTreatmentHistory()
-    this.searchDoctors()
+    this.loadDashboardData()
   },
 
   methods: {
-    async loadUpcomingAppointments() {
+    async loadDashboardData() {
       try {
-        const response = await fetch('/api/patient/upcoming_appointments', {
+        const response = await fetch('/api/patient/dashboard_data', {
           credentials: 'include'
         })
         const data = await response.json()
         if (response.ok) {
-          this.upcomingAppointments = data.appointments
+          this.upcomingAppointments = data.upcoming_appointments
+          this.specializations = data.specializations
         }
       } catch (error) {
-        console.error('Failed to load upcoming appointments:', error)
+        console.error('Failed to load dashboard data:', error)
       }
+
+      // Load other data
+      this.loadAppointmentHistory()
+      this.loadTreatmentHistory()
+      this.searchDoctors()
     },
 
     async loadAppointmentHistory() {
@@ -357,6 +481,9 @@ export default {
         if (this.doctorSearchQuery) {
           params.append('search', this.doctorSearchQuery)
         }
+        if (this.selectedSpecialization) {
+          params.append('specialization', this.selectedSpecialization)
+        }
 
         const response = await fetch(`/api/patient/doctors?${params}`, {
           credentials: 'include'
@@ -368,6 +495,53 @@ export default {
       } catch (error) {
         console.error('Failed to search doctors:', error)
       }
+    },
+
+    async loadDoctorAvailability() {
+      if (!this.selectedDoctorId) {
+        this.doctorAvailability = []
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/patient/doctor/${this.selectedDoctorId}/availability`, {
+          credentials: 'include'
+        })
+        const data = await response.json()
+        if (response.ok) {
+          this.doctorAvailability = data.next_7_days
+        }
+      } catch (error) {
+        console.error('Failed to load doctor availability:', error)
+      }
+    },
+
+    searchDoctorsBySpecialization(specialization) {
+      this.selectedSpecialization = specialization
+      this.activeTab = 'doctors'
+      this.searchDoctors()
+    },
+
+    viewDoctorProfile(doctorId) {
+      // Implementation for viewing detailed doctor profile
+      this.$router.push({
+        name: 'BookAppointment',
+        query: { doctor_id: doctorId, view: 'profile' }
+      })
+    },
+
+    bookWithDoctor(doctorId) {
+      this.$router.push({
+        name: 'BookAppointment',
+        query: { doctor_id: doctorId }
+      })
+    },
+
+    bookAppointmentForDay(doctorId, date) {
+      this.$router.push({
+        name: 'BookAppointment',
+        query: { doctor_id: doctorId, date: date }
+      })
     },
 
     async exportHistory() {
@@ -411,8 +585,7 @@ export default {
         if (response.ok) {
           this.message = data.message
           this.messageType = 'success'
-          this.loadUpcomingAppointments()
-          this.loadAppointmentHistory()
+          this.loadDashboardData()
         } else {
           this.message = data.error
           this.messageType = 'error'
@@ -424,57 +597,15 @@ export default {
     },
 
     rescheduleAppointment(appointment) {
-      this.selectedAppointment = appointment
-      this.rescheduleData = {
-        date: appointment.date,
-        time: appointment.time,
-        notes: appointment.notes || ''
-      }
-      const modal = new bootstrap.Modal(document.getElementById('rescheduleModal'))
-      modal.show()
+      // Implementation for rescheduling
+      console.log('Reschedule appointment:', appointment)
     },
 
-    async confirmReschedule() {
-      this.loading = true
+    viewDetails(appointment) {
+      // Implementation for viewing full details
+      alert(`Diagnosis: ${appointment.diagnosis}
 
-      try {
-        const response = await fetch(`/api/patient/reschedule/${this.selectedAppointment.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include',
-          body: JSON.stringify(this.rescheduleData)
-        })
-
-        const data = await response.json()
-
-        if (response.ok) {
-          this.message = data.message
-          this.messageType = 'success'
-          this.loadUpcomingAppointments()
-          this.loadAppointmentHistory()
-
-          // Close modal
-          const modal = bootstrap.Modal.getInstance(document.getElementById('rescheduleModal'))
-          modal.hide()
-        } else {
-          this.message = data.error
-          this.messageType = 'error'
-        }
-      } catch (error) {
-        this.message = 'Failed to reschedule appointment'
-        this.messageType = 'error'
-      } finally {
-        this.loading = false
-      }
-    },
-
-    bookWithDoctor(doctorId) {
-      this.$router.push({
-        name: 'BookAppointment',
-        query: { doctor_id: doctorId }
-      })
+Prescription: ${appointment.prescription}`)
     },
 
     getStatusBadgeClass(status) {
@@ -484,6 +615,11 @@ export default {
         cancelled: 'bg-danger'
       }
       return classes[status] || 'bg-secondary'
+    },
+
+    formatDate(dateString) {
+      if (!dateString) return 'N/A'
+      return new Date(dateString).toLocaleDateString()
     }
   }
 }

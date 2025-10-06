@@ -4,6 +4,7 @@ from flask_mail import Mail
 from flask_cors import CORS
 from config import Config
 import os
+from datetime import datetime
 
 # Initialize extensions
 mail = Mail()
@@ -31,10 +32,11 @@ def create_app():
     app.register_blueprint(doctor_bp, url_prefix='/api/doctor')
     app.register_blueprint(patient_bp, url_prefix='/api/patient')
 
-    # Create database tables and default admin
+    # Create database tables, default admin, and specializations
     with app.app_context():
         db.create_all()
         create_default_admin()
+        create_default_specializations()
 
         # Create exports directory
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -44,7 +46,16 @@ def create_app():
     def index():
         return jsonify({
             'message': 'Medical Appointment System API',
-            'version': '1.0.0',
+            'version': '2.0.0',
+            'features': [
+                'Role-based authentication (Admin, Doctor, Patient)',
+                'Specialization management',
+                'Appointment booking with 7-day availability',
+                'Diagnosis and prescription tracking',
+                'Treatment history management',
+                'Enhanced admin dashboard',
+                'Patient dashboard with specialization view'
+            ],
             'endpoints': {
                 'auth': '/api/auth/*',
                 'admin': '/api/admin/*',
@@ -91,16 +102,58 @@ def create_default_admin():
         print("   Password: admin123")
         print("   ⚠️  Please change password after first login!")
 
-if __name__ == '__main__':
-    from datetime import datetime
+def create_default_specializations():
+    """Create default specializations/departments"""
+    from models import db, Specialization
 
+    default_specializations = [
+        {'name': 'Cardiology', 'description': 'Heart and cardiovascular system'},
+        {'name': 'Dermatology', 'description': 'Skin, hair, and nail conditions'},
+        {'name': 'Endocrinology', 'description': 'Hormonal and metabolic disorders'},
+        {'name': 'Gastroenterology', 'description': 'Digestive system disorders'},
+        {'name': 'General Medicine', 'description': 'General health and common illnesses'},
+        {'name': 'Gynecology', 'description': 'Women\'s reproductive health'},
+        {'name': 'Neurology', 'description': 'Nervous system disorders'},
+        {'name': 'Oncology', 'description': 'Cancer diagnosis and treatment'},
+        {'name': 'Ophthalmology', 'description': 'Eye and vision care'},
+        {'name': 'Orthopedics', 'description': 'Bone, joint, and muscle disorders'},
+        {'name': 'Pediatrics', 'description': 'Children\'s health and development'},
+        {'name': 'Psychiatry', 'description': 'Mental health and behavioral disorders'},
+        {'name': 'Pulmonology', 'description': 'Respiratory system disorders'},
+        {'name': 'Radiology', 'description': 'Medical imaging and diagnostics'},
+        {'name': 'Urology', 'description': 'Urinary system and male reproductive health'}
+    ]
+
+    created_count = 0
+    for spec_data in default_specializations:
+        existing = Specialization.query.filter_by(name=spec_data['name']).first()
+        if not existing:
+            specialization = Specialization(
+                name=spec_data['name'],
+                description=spec_data['description']
+            )
+            db.session.add(specialization)
+            created_count += 1
+
+    if created_count > 0:
+        db.session.commit()
+        print(f"✅ Created {created_count} default specializations")
+
+if __name__ == '__main__':
     app = create_app()
 
-    print("🏥 Medical Appointment System API")
-    print("=" * 40)
+    print("🏥 Medical Appointment System API v2.0")
+    print("=" * 50)
     print("🚀 Starting Flask development server...")
     print("📱 Frontend: http://localhost:5173")
     print("🔗 API: http://localhost:5000")
-    print("📚 API Docs: http://localhost:5000")
+    print("📚 API Documentation: http://localhost:5000")
+    print("NEW FEATURES:")
+    print("✅ Specialization/Department management")
+    print("✅ 7-day doctor availability view")
+    print("✅ Diagnosis and prescription tracking")
+    print("✅ Enhanced admin dashboard")
+    print("✅ Detailed patient history")
+    print("✅ Doctor profile management")
 
     app.run(debug=True, host='0.0.0.0', port=5000)

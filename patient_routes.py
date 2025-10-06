@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, session
-from models import db, User, Appointment, TreatmentHistory
+from models import db, User, Appointment, TreatmentHistory, Specialization
 from utils import login_required, role_required, get_cached_doctors_list, is_double_booking
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timedelta
 from tasks import export_patient_history
 
 patient_bp = Blueprint('patient', __name__)
@@ -40,12 +40,33 @@ def update_profile():
         db.session.rollback()
         return jsonify({'error': f'Failed to update profile: {str(e)}'}), 500
 
+@patient_bp.route('/specializations', methods=['GET'])
+@role_required('patient')
+def get_specializations():
+    """Get all available specializations/departments"""
+    try:
+        # Get specializations from database
+        specializations = Specialization.query.all()
+        spec_list = [spec.to_dict() for spec in specializations]
+
+        # If no specializations in DB, get from doctors
+        if not spec_list:
+            doctors = User.query.filter_by(role='doctor').filter(User.specialization.isnot(None)).all()
+            unique_specs = list(set([doc.specialization for doc in doctors if doc.specialization]))
+            spec_list = [{'name': spec, 'description': ''} for spec in unique_specs]
+
+        return jsonify({'specializations': spec_list}), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to get specializations: {str(e)}'}), 500
+
 @patient_bp.route('/doctors', methods=['GET'])
 @role_required('patient')
 def get_doctors():
-    """Get list of available doctors (cached)"""
+    """Get list of available doctors with enhanced filtering"""
     try:
         search_query = request.args.get('search', '').strip()
+        specialization = request.args.get('specialization', '').strip()
 
         # Get cached doctors list
         doctors = get_cached_doctors_list()
@@ -55,7 +76,15 @@ def get_doctors():
             doctors = [
                 doctor for doctor in doctors 
                 if search_query.lower() in doctor['name'].lower() or 
-                   search_query.lower() in doctor['email'].lower()
+                   search_query.lower() in doctor['email'].lower() or
+                   (doctor.get('specialization') and search_query.lower() in doctor['specialization'].lower())
+            ]
+
+        # Filter by specialization
+        if specialization:
+            doctors = [
+                doctor for doctor in doctors 
+                if doctor.get('specialization') and specialization.lower() in doctor['specialization'].lower()
             ]
 
         return jsonify({'doctors': doctors}), 200
@@ -63,16 +92,84 @@ def get_doctors():
     except Exception as e:
         return jsonify({'error': f'Failed to get doctors: {str(e)}'}), 500
 
+@patient_bp.route('/doctor/<int:doctor_id>/profile', methods=['GET'])
+@role_required('patient')
+def get_doctor_profile(doctor_id):
+    """Get detailed doctor profile"""
+    try:
+        doctor = User.query.filter_by(id=doctor_id, role='doctor').first()
+        if not doctor:
+            return jsonify({'error': 'Doctor not found'}), 404
+
+        # Get doctor's availability
+        from utils import get_cached_doctor_availability
+        availability = get_cached_doctor_availability(doctor_id)
+
+        # Get total appointments and completed appointments
+        total_appointments = Appointment.query.filter_by(doctor_id=doctor_id).count()
+        completed_appointments = Appointment.query.filter_by(doctor_id=doctor_id, status='completed').count()
+
+        # Get recent reviews/ratings if any
+        recent_treatments = TreatmentHistory.query.filter_by(doctor_id=doctor_id).order_by(
+            TreatmentHistory.created_at.desc()
+        ).limit(5).all()
+
+        profile_data = doctor.to_dict()
+        profile_data.update({
+            'availability': availability,
+            'total_appointments': total_appointments,
+            'completed_appointments': completed_appointments,
+            'recent_treatments': [treatment.to_dict() for treatment in recent_treatments]
+        })
+
+        return jsonify({'doctor_profile': profile_data}), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to get doctor profile: {str(e)}'}), 500
+
 @patient_bp.route('/doctor/<int:doctor_id>/availability', methods=['GET'])
 @role_required('patient')
 def get_doctor_availability(doctor_id):
-    """Get specific doctor's availability"""
+    """Get specific doctor's availability for next 7 days"""
     try:
         from utils import get_cached_doctor_availability
 
         availability = get_cached_doctor_availability(doctor_id)
 
-        return jsonify({'availability': availability}), 200
+        # Generate next 7 days availability
+        next_7_days = []
+        today = date.today()
+
+        for i in range(7):
+            check_date = today + timedelta(days=i)
+            day_of_week = check_date.weekday()  # 0=Monday, 6=Sunday
+
+            # Find availability for this day
+            day_availability = [avail for avail in availability if avail['day_of_week'] == day_of_week]
+
+            # Get existing appointments for this day
+            existing_appointments = Appointment.query.filter_by(
+                doctor_id=doctor_id,
+                date=check_date,
+                status='booked'
+            ).all()
+
+            booked_times = [app.time.strftime('%H:%M') for app in existing_appointments]
+
+            day_data = {
+                'date': check_date.isoformat(),
+                'day_name': check_date.strftime('%A'),
+                'availability': day_availability,
+                'booked_times': booked_times,
+                'is_available': len(day_availability) > 0
+            }
+
+            next_7_days.append(day_data)
+
+        return jsonify({
+            'doctor_id': doctor_id,
+            'next_7_days': next_7_days
+        }), 200
 
     except Exception as e:
         return jsonify({'error': f'Failed to get doctor availability: {str(e)}'}), 500
@@ -224,7 +321,7 @@ def cancel_appointment(appointment_id):
 @patient_bp.route('/history', methods=['GET'])
 @role_required('patient')
 def get_history():
-    """Get patient's appointment history"""
+    """Get patient's appointment history with diagnosis and prescriptions"""
     try:
         page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', 10))
@@ -263,7 +360,7 @@ def get_history():
 @patient_bp.route('/treatment_history', methods=['GET'])
 @role_required('patient')
 def get_treatment_history():
-    """Get patient's treatment history"""
+    """Get patient's detailed treatment history with diagnosis and prescriptions"""
     try:
         page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', 10))
@@ -309,7 +406,7 @@ def export_history():
 @patient_bp.route('/upcoming_appointments', methods=['GET'])
 @role_required('patient')
 def get_upcoming_appointments():
-    """Get patient's upcoming appointments"""
+    """Get patient's upcoming appointments with status"""
     try:
         today = date.today()
 
@@ -328,3 +425,48 @@ def get_upcoming_appointments():
 
     except Exception as e:
         return jsonify({'error': f'Failed to get upcoming appointments: {str(e)}'}), 500
+
+@patient_bp.route('/dashboard_data', methods=['GET'])
+@role_required('patient')
+def get_dashboard_data():
+    """Get all dashboard data in one call"""
+    try:
+        today = date.today()
+
+        # Upcoming appointments
+        upcoming_appointments = Appointment.query.filter(
+            Appointment.patient_id == session['user_id'],
+            Appointment.status == 'booked',
+            Appointment.date >= today
+        ).order_by(
+            Appointment.date.asc(),
+            Appointment.time.asc()
+        ).limit(5).all()
+
+        # Past appointments with diagnosis
+        past_appointments = Appointment.query.filter(
+            Appointment.patient_id == session['user_id'],
+            Appointment.status == 'completed',
+            Appointment.date < today
+        ).order_by(
+            Appointment.date.desc()
+        ).limit(5).all()
+
+        # Available specializations
+        specializations = Specialization.query.all()
+        if not specializations:
+            # Get from doctors if no specializations in DB
+            doctors = User.query.filter_by(role='doctor').filter(User.specialization.isnot(None)).all()
+            unique_specs = list(set([doc.specialization for doc in doctors if doc.specialization]))
+            specializations = [{'name': spec, 'description': ''} for spec in unique_specs]
+        else:
+            specializations = [spec.to_dict() for spec in specializations]
+
+        return jsonify({
+            'upcoming_appointments': [app.to_dict() for app in upcoming_appointments],
+            'past_appointments': [app.to_dict() for app in past_appointments],
+            'specializations': specializations
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to get dashboard data: {str(e)}'}), 500

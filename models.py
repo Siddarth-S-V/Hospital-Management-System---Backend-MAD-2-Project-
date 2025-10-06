@@ -14,6 +14,13 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(128), nullable=False)
     role = db.Column(db.String(20), nullable=False)  # admin, doctor, patient
     phone = db.Column(db.String(20))
+
+    # NEW: Doctor-specific fields
+    specialization = db.Column(db.String(100))  # Doctor's specialization
+    qualification = db.Column(db.String(200))   # Doctor's qualifications
+    experience = db.Column(db.Integer)          # Years of experience
+    consultation_fee = db.Column(db.Float)      # Consultation fee
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -30,7 +37,7 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self):
-        return {
+        data = {
             'id': self.id,
             'name': self.name,
             'email': self.email,
@@ -38,6 +45,17 @@ class User(UserMixin, db.Model):
             'phone': self.phone,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+
+        # Add doctor-specific fields
+        if self.role == 'doctor':
+            data.update({
+                'specialization': self.specialization,
+                'qualification': self.qualification,
+                'experience': self.experience,
+                'consultation_fee': self.consultation_fee
+            })
+
+        return data
 
 class Availability(db.Model):
     __tablename__ = 'availability'
@@ -68,6 +86,11 @@ class Appointment(db.Model):
     time = db.Column(db.Time, nullable=False)
     status = db.Column(db.String(20), default='booked')  # booked, completed, cancelled
     notes = db.Column(db.Text)
+
+    # NEW: Added diagnosis and prescription fields
+    diagnosis = db.Column(db.Text)      # Doctor's diagnosis
+    prescription = db.Column(db.Text)   # Doctor's prescription
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -81,10 +104,13 @@ class Appointment(db.Model):
             'doctor_id': self.doctor_id,
             'patient_name': self.patient.name if self.patient else None,
             'doctor_name': self.doctor.name if self.doctor else None,
+            'doctor_specialization': self.doctor.specialization if self.doctor else None,
             'date': self.date.isoformat() if self.date else None,
             'time': self.time.strftime('%H:%M') if self.time else None,
             'status': self.status,
             'notes': self.notes,
+            'diagnosis': self.diagnosis,
+            'prescription': self.prescription,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
@@ -97,6 +123,13 @@ class TreatmentHistory(db.Model):
     patient_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     appointment_id = db.Column(db.Integer, db.ForeignKey('appointments.id'), nullable=False)
     summary = db.Column(db.Text, nullable=False)
+
+    # NEW: Additional fields for detailed treatment history
+    diagnosis = db.Column(db.Text)              # Detailed diagnosis
+    prescription = db.Column(db.Text)           # Prescribed medications
+    follow_up_date = db.Column(db.Date)         # Next follow-up date
+    treatment_notes = db.Column(db.Text)        # Additional treatment notes
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -108,5 +141,26 @@ class TreatmentHistory(db.Model):
             'doctor_name': self.treating_doctor.name if self.treating_doctor else None,
             'patient_name': self.treated_patient.name if self.treated_patient else None,
             'summary': self.summary,
+            'diagnosis': self.diagnosis,
+            'prescription': self.prescription,
+            'follow_up_date': self.follow_up_date.isoformat() if self.follow_up_date else None,
+            'treatment_notes': self.treatment_notes,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+# NEW: Specialization/Department model
+class Specialization(db.Model):
+    __tablename__ = 'specializations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
